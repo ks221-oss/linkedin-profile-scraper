@@ -287,4 +287,5 @@ def download(job_id):
 if __name__ == "__main__":
     os.makedirs("uploads", exist_ok=True)
     os.makedirs("outputs", exist_ok=True)
-    app.run(debug=False, port=5050)
+    port = int(os.getenv("PORT", 5050))
+    app.run(debug=False, host="0.0.0.0", port=port)
