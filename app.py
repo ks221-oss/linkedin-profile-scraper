@@ -234,6 +234,9 @@ def index():
 
 @app.route("/upload", methods=["POST"])
 def upload():
+    if not APIFY_TOKEN:
+        return jsonify({"error": "APIFY_API_TOKEN is not configured. Please add it to your environment secrets and restart the app."}), 500
+
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
 
