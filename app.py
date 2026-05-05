@@ -1,8 +1,10 @@
 import os
 import csv
+import json
 import uuid
 import threading
 import time
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify, send_file, render_template
 from dotenv import load_dotenv
 import requests as http_requests
@@ -13,6 +15,10 @@ app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = "uploads"
 app.config["OUTPUT_FOLDER"] = "outputs"
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
+
+# Ensure directories exist at import time (also for gunicorn workers)
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("outputs", exist_ok=True)
 
 APIFY_TOKEN = os.getenv("APIFY_API_TOKEN")
 
@@ -44,8 +50,60 @@ def normalize_linkedin_url(url: str) -> str:
         url += "/"
     return url
 
-# In-memory job tracker: job_id -> { status, progress, total, output_file, error }
+# Persistent job tracker: job_id -> { status, progress, total, output_file, error, ... }
+JOBS_FILE = "jobs.json"
 jobs = {}
+jobs_lock = threading.Lock()
+
+
+def load_jobs():
+    """Load jobs from disk. Mark interrupted jobs as errored on startup."""
+    global jobs
+    if not os.path.exists(JOBS_FILE):
+        jobs = {}
+        return
+
+    try:
+        with open(JOBS_FILE, "r") as f:
+            jobs = json.load(f)
+
+        # Any job that was running when the server restarted is now interrupted
+        interrupted_count = 0
+        for job_id, job in jobs.items():
+            if job.get("status") in ("queued", "reading", "scraping"):
+                job["status"] = "error"
+                job["error"] = "Run was interrupted (server restarted). Please upload the file again to retry."
+                interrupted_count += 1
+
+        if interrupted_count > 0:
+            print(f"⚠️  Marked {interrupted_count} interrupted job(s) as errored on startup")
+            save_jobs()
+    except Exception as e:
+        print(f"Could not load jobs.json: {e}")
+        jobs = {}
+
+
+def save_jobs():
+    """Persist jobs dict to disk. Thread-safe."""
+    with jobs_lock:
+        try:
+            tmp = JOBS_FILE + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(jobs, f, indent=2, default=str)
+            os.replace(tmp, JOBS_FILE)
+        except Exception as e:
+            print(f"Could not save jobs.json: {e}")
+
+
+def update_job(job_id: str, **fields):
+    """Update a job's fields and persist to disk."""
+    if job_id in jobs:
+        jobs[job_id].update(fields)
+        save_jobs()
+
+
+# Load jobs at module import time (so gunicorn workers also load history)
+load_jobs()
 
 
 # ── Scraping Logic ────────────────────────────────────────
@@ -273,7 +331,7 @@ def find_url_column(headers):
 
 def process_job(job_id: str, input_path: str, output_path: str):
     try:
-        jobs[job_id]["status"] = "reading"
+        update_job(job_id, status="reading")
 
         with open(input_path, "r", newline="", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
@@ -292,8 +350,7 @@ def process_job(job_id: str, input_path: str, output_path: str):
             else:
                 print(f"  [URL clean]      {clean}")
 
-        jobs[job_id]["total"] = len(valid_urls)
-        jobs[job_id]["status"] = "scraping"
+        update_job(job_id, total=len(valid_urls), status="scraping")
 
         # Scrape in batches
         all_profiles = {}
@@ -309,7 +366,7 @@ def process_job(job_id: str, input_path: str, output_path: str):
                 if pub_id:
                     all_profiles[pub_id] = profile
             scraped += len(batch)
-            jobs[job_id]["progress"] = scraped
+            update_job(job_id, progress=scraped)
 
         # Build output
         scraped_cols = get_scraped_columns()
@@ -324,7 +381,7 @@ def process_job(job_id: str, input_path: str, output_path: str):
 
             # Replace the original URL column with the cleaned URL
             if url and "linkedin.com/in/" in url:
-                out_row[url_col] = url  # Update the original URL column with the clean URL
+                out_row[url_col] = url
 
                 profile = all_profiles.get(url)
                 if not profile:
@@ -346,34 +403,41 @@ def process_job(job_id: str, input_path: str, output_path: str):
             writer.writeheader()
             writer.writerows(output_rows)
 
-        jobs[job_id]["status"] = "done"
-        jobs[job_id]["matched"] = matched
-        jobs[job_id]["failed_urls"] = failed_urls
-        jobs[job_id]["output_file"] = output_path
+        update_job(
+            job_id,
+            status="done",
+            matched=matched,
+            failed_count=len(failed_urls),
+            failed_urls=failed_urls,
+            output_file=output_path,
+            completed_at=datetime.now(timezone.utc).isoformat(),
+        )
 
     except Exception as e:
-        jobs[job_id]["status"] = "error"
         # Provide user-friendly error messages for common issues
         err_str = str(e)
         if "502" in err_str or "Bad Gateway" in err_str:
-            jobs[job_id]["error"] = "Apify's servers are temporarily unavailable (502). Please try again in a minute."
+            err_msg = "Apify's servers are temporarily unavailable (502). Please try again in a minute."
         elif "503" in err_str or "Service Unavailable" in err_str:
-            jobs[job_id]["error"] = "Apify service is temporarily down (503). Please try again shortly."
+            err_msg = "Apify service is temporarily down (503). Please try again shortly."
         elif "504" in err_str or "Gateway Timeout" in err_str:
-            jobs[job_id]["error"] = "Apify request timed out (504). Please try again with a smaller batch."
+            err_msg = "Apify request timed out (504). Please try again with a smaller batch."
         elif "402" in err_str or "Payment Required" in err_str:
-            jobs[job_id]["error"] = "Apify account is out of credits. Please check your billing."
+            err_msg = "Apify account is out of credits. Please check your billing."
         elif "401" in err_str or "Unauthorized" in err_str:
-            jobs[job_id]["error"] = "Apify API token is invalid or expired."
+            err_msg = "Apify API token is invalid or expired."
         elif "Connection" in err_str or "Timeout" in err_str:
-            jobs[job_id]["error"] = "Network connection issue. Please check your internet and try again."
+            err_msg = "Network connection issue. Please check your internet and try again."
         else:
-            jobs[job_id]["error"] = f"Unexpected error: {err_str}"
+            err_msg = f"Unexpected error: {err_str}"
+
+        update_job(
+            job_id,
+            status="error",
+            error=err_msg,
+            completed_at=datetime.now(timezone.utc).isoformat(),
+        )
         print(f"  ❌ Job {job_id} failed: {err_str}")
-    finally:
-        # Clean up input file
-        if os.path.exists(input_path):
-            os.remove(input_path)
 
 
 # ── Routes ────────────────────────────────────────────────
@@ -402,13 +466,20 @@ def upload():
     file.save(input_path)
 
     jobs[job_id] = {
+        "job_id": job_id,
+        "filename": file.filename,
         "status": "queued",
         "progress": 0,
         "total": 0,
         "matched": 0,
+        "failed_count": 0,
+        "input_file": input_path,
         "output_file": None,
         "error": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
     }
+    save_jobs()
 
     thread = threading.Thread(target=process_job, args=(job_id, input_path, output_path))
     thread.daemon = True
@@ -425,21 +496,91 @@ def status(job_id):
     return jsonify(job)
 
 
+@app.route("/history")
+def history():
+    """Return all jobs sorted by creation time (newest first)."""
+    # Strip out heavy fields like failed_urls list for the list view
+    summary = []
+    for job_id, job in jobs.items():
+        summary.append({
+            "job_id": job_id,
+            "filename": job.get("filename", "untitled.csv"),
+            "status": job.get("status"),
+            "progress": job.get("progress", 0),
+            "total": job.get("total", 0),
+            "matched": job.get("matched", 0),
+            "failed_count": job.get("failed_count", 0),
+            "error": job.get("error"),
+            "created_at": job.get("created_at"),
+            "completed_at": job.get("completed_at"),
+            "has_input": bool(job.get("input_file") and os.path.exists(job.get("input_file", ""))),
+            "has_output": bool(job.get("output_file") and os.path.exists(job.get("output_file", ""))),
+        })
+    # Newest first
+    summary.sort(key=lambda j: j.get("created_at") or "", reverse=True)
+    return jsonify(summary)
+
+
 @app.route("/download/<job_id>")
 def download(job_id):
     job = jobs.get(job_id)
-    if not job or job["status"] != "done":
+    if not job or job.get("status") != "done":
         return jsonify({"error": "File not ready"}), 404
+    output_file = job.get("output_file")
+    if not output_file or not os.path.exists(output_file):
+        return jsonify({"error": "Output file not found"}), 404
+
+    base_name = os.path.splitext(job.get("filename", "linkedin"))[0]
     return send_file(
-        job["output_file"],
+        output_file,
         mimetype="text/csv",
         as_attachment=True,
-        download_name="linkedin_enriched.csv",
+        download_name=f"{base_name}_enriched.csv",
     )
 
 
+@app.route("/download-input/<job_id>")
+def download_input(job_id):
+    job = jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    input_file = job.get("input_file")
+    if not input_file or not os.path.exists(input_file):
+        return jsonify({"error": "Input file not found"}), 404
+    return send_file(
+        input_file,
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name=job.get("filename", "input.csv"),
+    )
+
+
+@app.route("/job/<job_id>", methods=["DELETE"])
+def delete_job(job_id):
+    """Delete a job and its associated files."""
+    job = jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+
+    # Don't allow deleting active jobs
+    if job.get("status") in ("queued", "reading", "scraping"):
+        return jsonify({"error": "Cannot delete an active job"}), 400
+
+    # Remove files
+    for path_key in ("input_file", "output_file"):
+        path = job.get(path_key)
+        if path and os.path.exists(path):
+            try:
+                os.remove(path)
+            except Exception as e:
+                print(f"Could not remove {path}: {e}")
+
+    # Remove from jobs dict
+    del jobs[job_id]
+    save_jobs()
+    return jsonify({"success": True})
+
+
 if __name__ == "__main__":
-    os.makedirs("uploads", exist_ok=True)
-    os.makedirs("outputs", exist_ok=True)
     port = int(os.getenv("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port)

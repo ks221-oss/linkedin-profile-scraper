@@ -13,20 +13,195 @@
       color: #e2e8f0;
       min-height: 100vh;
       display: flex;
+    }
+
+    /* ── Sidebar ───────────────────────────────────────── */
+    .sidebar {
+      width: 300px;
+      flex-shrink: 0;
+      background: #0f0f17;
+      border-right: 1px solid #1e1e2e;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+    }
+
+    .sidebar-header {
+      padding: 20px 18px 14px;
+      border-bottom: 1px solid #1e1e2e;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sidebar-logo {
+      width: 28px;
+      height: 28px;
+      background: #0077b5;
+      border-radius: 7px;
+      display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .sidebar-logo svg { width: 16px; height: 16px; fill: white; }
+
+    .sidebar-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .new-run-btn {
+      margin: 14px 16px 8px;
+      padding: 10px 14px;
+      background: #1a1a2a;
+      border: 1px solid #2a2a3e;
+      color: #e2e8f0;
+      border-radius: 9px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+
+    .new-run-btn:hover {
+      background: #1e1e2e;
+      border-color: #0077b5;
+    }
+
+    .new-run-btn svg { width: 14px; height: 14px; stroke: currentColor; }
+
+    .history-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #475569;
+      padding: 14px 16px 8px;
+      font-weight: 600;
+    }
+
+    .history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 8px 16px;
+    }
+
+    .history-list::-webkit-scrollbar { width: 6px; }
+    .history-list::-webkit-scrollbar-thumb { background: #2a2a3e; border-radius: 99px; }
+
+    .history-empty {
+      text-align: center;
+      color: #475569;
+      font-size: 13px;
+      padding: 32px 16px;
+      line-height: 1.6;
+    }
+
+    .history-item {
+      padding: 10px 12px;
+      margin-bottom: 4px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+    }
+
+    .history-item:hover { background: #1a1a2a; }
+    .history-item.active { background: #1e1e2e; }
+
+    .history-item-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .status-dot.done { background: #10b981; }
+    .status-dot.error { background: #ef4444; }
+    .status-dot.running { background: #0077b5; animation: pulse 1.5s ease-in-out infinite; }
+    .status-dot.partial { background: #f59e0b; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .history-item-name {
+      font-size: 13px;
+      color: #cbd5e1;
+      font-weight: 500;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .history-item-meta {
+      font-size: 11px;
+      color: #64748b;
+      margin-left: 16px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .history-item-time {
+      font-size: 10px;
+      color: #475569;
+      margin-left: 16px;
+      margin-top: 2px;
+    }
+
+    .delete-btn {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #475569;
+      padding: 4px;
+      cursor: pointer;
+      border-radius: 5px;
+      opacity: 0;
+      transition: all 0.15s;
+    }
+
+    .history-item:hover .delete-btn { opacity: 1; }
+    .delete-btn:hover { color: #ef4444; background: #2a2a3e; }
+    .delete-btn svg { width: 13px; height: 13px; stroke: currentColor; }
+
+    /* ── Main content ──────────────────────────────────── */
+    .main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      min-height: 100vh;
+      overflow-y: auto;
     }
 
     .container {
       width: 100%;
       max-width: 640px;
-      padding: 24px;
     }
 
-    /* Header */
     .header {
       text-align: center;
-      margin-bottom: 48px;
+      margin-bottom: 36px;
     }
 
     .logo {
@@ -37,38 +212,37 @@
       height: 56px;
       background: #0077b5;
       border-radius: 14px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
 
     .logo svg { width: 30px; height: 30px; fill: white; }
 
     h1 {
-      font-size: 28px;
+      font-size: 26px;
       font-weight: 700;
       letter-spacing: -0.5px;
       color: #f1f5f9;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .subtitle {
-      font-size: 15px;
+      font-size: 14px;
       color: #64748b;
       line-height: 1.5;
     }
 
-    /* Card */
     .card {
       background: #13131a;
       border: 1px solid #1e1e2e;
-      border-radius: 20px;
-      padding: 36px;
+      border-radius: 18px;
+      padding: 32px;
     }
 
-    /* Upload zone */
+    /* ── Upload zone ───────────────────────────────────── */
     .upload-zone {
       border: 2px dashed #2a2a3e;
-      border-radius: 14px;
-      padding: 48px 24px;
+      border-radius: 12px;
+      padding: 40px 20px;
       text-align: center;
       cursor: pointer;
       transition: all 0.2s;
@@ -81,45 +255,24 @@
     }
 
     .upload-zone input[type="file"] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-      width: 100%;
-      height: 100%;
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
     }
 
     .upload-icon {
-      width: 48px;
-      height: 48px;
-      margin: 0 auto 16px;
+      width: 44px; height: 44px;
+      margin: 0 auto 14px;
       background: #1e1e2e;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      border-radius: 11px;
+      display: flex; align-items: center; justify-content: center;
     }
 
-    .upload-icon svg { width: 24px; height: 24px; stroke: #64748b; }
+    .upload-icon svg { width: 22px; height: 22px; stroke: #64748b; }
 
-    .upload-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #cbd5e1;
-      margin-bottom: 6px;
-    }
+    .upload-title { font-size: 15px; font-weight: 600; color: #cbd5e1; margin-bottom: 5px; }
+    .upload-hint { font-size: 12px; color: #475569; }
+    .upload-hint span { color: #0077b5; font-weight: 500; }
 
-    .upload-hint {
-      font-size: 13px;
-      color: #475569;
-    }
-
-    .upload-hint span {
-      color: #0077b5;
-      font-weight: 500;
-    }
-
-    /* File selected state */
+    /* ── File selected ─────────────────────────────────── */
     .file-selected {
       display: none;
       align-items: center;
@@ -127,106 +280,81 @@
       background: #1a1a2a;
       border: 1px solid #2a2a3e;
       border-radius: 10px;
-      padding: 14px 16px;
-      margin-top: 16px;
+      padding: 12px 14px;
+      margin-top: 14px;
     }
 
     .file-selected.show { display: flex; }
 
     .file-icon {
-      width: 36px;
-      height: 36px;
+      width: 32px; height: 32px;
       background: rgba(0, 119, 181, 0.15);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
     }
 
-    .file-icon svg { width: 18px; height: 18px; stroke: #0077b5; }
+    .file-icon svg { width: 16px; height: 16px; stroke: #0077b5; }
 
     .file-info { flex: 1; min-width: 0; }
-    .file-name { font-size: 14px; font-weight: 500; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .file-size { font-size: 12px; color: #475569; margin-top: 2px; }
+    .file-name { font-size: 13px; font-weight: 500; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-size { font-size: 11px; color: #475569; margin-top: 1px; }
 
     .remove-file {
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: #475569;
-      padding: 4px;
-      display: flex;
-      border-radius: 6px;
-      transition: all 0.15s;
+      background: none; border: none; cursor: pointer;
+      color: #475569; padding: 4px;
+      display: flex; border-radius: 5px;
     }
 
     .remove-file:hover { color: #e2e8f0; background: #2a2a3e; }
-    .remove-file svg { width: 16px; height: 16px; stroke: currentColor; }
+    .remove-file svg { width: 15px; height: 15px; stroke: currentColor; }
 
-    /* Format hint */
+    /* ── Format hint ───────────────────────────────────── */
     .format-hint {
-      margin-top: 16px;
-      padding: 12px 14px;
+      margin-top: 14px;
+      padding: 11px 13px;
       background: rgba(0, 119, 181, 0.08);
       border: 1px solid rgba(0, 119, 181, 0.2);
-      border-radius: 10px;
-      font-size: 13px;
+      border-radius: 9px;
+      font-size: 12px;
       color: #64748b;
       line-height: 1.5;
     }
 
     .format-hint strong { color: #94a3b8; font-weight: 500; }
 
-    /* Submit button */
+    /* ── Submit button ─────────────────────────────────── */
     .submit-btn {
       width: 100%;
-      margin-top: 20px;
-      padding: 14px;
+      margin-top: 18px;
+      padding: 13px;
       background: #0077b5;
       color: white;
       border: none;
-      border-radius: 12px;
-      font-size: 15px;
+      border-radius: 11px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       gap: 8px;
     }
 
     .submit-btn:hover:not(:disabled) { background: #005f91; }
     .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .submit-btn svg { width: 18px; height: 18px; stroke: white; }
+    .submit-btn svg { width: 16px; height: 16px; stroke: white; }
 
-    /* Progress section */
-    .progress-section {
-      display: none;
-      margin-top: 28px;
-    }
-
+    /* ── Progress ──────────────────────────────────────── */
+    .progress-section { display: none; margin-top: 24px; }
     .progress-section.show { display: block; }
 
     .progress-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 8px;
     }
 
-    .progress-label {
-      font-size: 14px;
-      font-weight: 500;
-      color: #94a3b8;
-    }
-
-    .progress-count {
-      font-size: 13px;
-      color: #475569;
-      font-variant-numeric: tabular-nums;
-    }
+    .progress-label { font-size: 13px; font-weight: 500; color: #94a3b8; }
+    .progress-count { font-size: 12px; color: #475569; font-variant-numeric: tabular-nums; }
 
     .progress-bar-track {
       height: 6px;
@@ -245,16 +373,13 @@
 
     .status-text {
       margin-top: 10px;
-      font-size: 13px;
+      font-size: 12px;
       color: #475569;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      display: flex; align-items: center; gap: 6px;
     }
 
     .spinner {
-      width: 14px;
-      height: 14px;
+      width: 13px; height: 13px;
       border: 2px solid #2a2a3e;
       border-top-color: #0077b5;
       border-radius: 50%;
@@ -263,276 +388,482 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Done state */
-    .done-section {
-      display: none;
-      margin-top: 28px;
-    }
-
+    /* ── Done card ─────────────────────────────────────── */
+    .done-section { display: none; margin-top: 24px; }
     .done-section.show { display: block; }
 
     .done-card {
       background: rgba(16, 185, 129, 0.08);
       border: 1px solid rgba(16, 185, 129, 0.25);
-      border-radius: 14px;
-      padding: 24px;
+      border-radius: 12px;
+      padding: 22px;
       text-align: center;
     }
 
-    .done-card.partial {
-      background: rgba(245, 158, 11, 0.08);
-      border-color: rgba(245, 158, 11, 0.25);
-    }
-
-    .done-card.none {
-      background: rgba(239, 68, 68, 0.08);
-      border-color: rgba(239, 68, 68, 0.25);
-    }
+    .done-card.partial { background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25); }
+    .done-card.none { background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.25); }
 
     .done-icon {
-      width: 48px;
-      height: 48px;
+      width: 44px; height: 44px;
       background: rgba(16, 185, 129, 0.15);
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 10px;
     }
 
-    .done-card.partial .done-icon {
-      background: rgba(245, 158, 11, 0.15);
-    }
+    .done-card.partial .done-icon { background: rgba(245, 158, 11, 0.15); }
+    .done-card.none .done-icon { background: rgba(239, 68, 68, 0.15); }
 
-    .done-card.none .done-icon {
-      background: rgba(239, 68, 68, 0.15);
-    }
-
-    .done-icon svg { width: 24px; height: 24px; stroke: #10b981; }
+    .done-icon svg { width: 22px; height: 22px; stroke: #10b981; }
     .done-card.partial .done-icon svg { stroke: #f59e0b; }
     .done-card.none .done-icon svg { stroke: #ef4444; }
 
-    .done-title {
-      font-size: 17px;
-      font-weight: 600;
-      color: #e2e8f0;
-      margin-bottom: 4px;
-    }
+    .done-title { font-size: 16px; font-weight: 600; color: #e2e8f0; margin-bottom: 4px; }
+    .done-subtitle { font-size: 12px; color: #64748b; margin-bottom: 16px; }
 
-    .done-subtitle {
-      font-size: 13px;
-      color: #64748b;
-      margin-bottom: 20px;
+    .download-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
     }
-
-    .failed-urls {
-      margin: 0 0 16px;
-      text-align: left;
-      background: rgba(0,0,0,0.2);
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 12px;
-      color: #94a3b8;
-      max-height: 100px;
-      overflow-y: auto;
-    }
-
-    .failed-urls strong { color: #cbd5e1; display: block; margin-bottom: 4px; }
-    .failed-urls span { display: block; color: #64748b; word-break: break-all; }
 
     .download-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 24px;
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 18px;
       background: #10b981;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      text-decoration: none;
+      color: white; border: none;
+      border-radius: 9px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; text-decoration: none;
       transition: all 0.2s;
     }
 
     .download-btn:hover { background: #059669; }
-    .download-btn svg { width: 16px; height: 16px; stroke: white; }
+    .download-btn svg { width: 14px; height: 14px; stroke: white; }
+
+    .download-btn.secondary {
+      background: #1a1a2a;
+      border: 1px solid #2a2a3e;
+      color: #cbd5e1;
+    }
+
+    .download-btn.secondary:hover { background: #1e1e2e; }
+    .download-btn.secondary svg { stroke: #cbd5e1; }
 
     .reset-btn {
-      display: block;
-      margin: 14px auto 0;
-      background: none;
-      border: none;
+      display: block; margin: 14px auto 0;
+      background: none; border: none;
       color: #475569;
-      font-size: 13px;
-      cursor: pointer;
+      font-size: 12px; cursor: pointer;
       text-decoration: underline;
-      transition: color 0.15s;
     }
 
     .reset-btn:hover { color: #94a3b8; }
 
-    /* Error state */
-    .error-section {
-      display: none;
-      margin-top: 28px;
-    }
-
+    /* ── Error ─────────────────────────────────────────── */
+    .error-section { display: none; margin-top: 24px; }
     .error-section.show { display: block; }
 
     .error-card {
       background: rgba(239, 68, 68, 0.08);
       border: 1px solid rgba(239, 68, 68, 0.25);
-      border-radius: 14px;
-      padding: 20px;
-      font-size: 14px;
+      border-radius: 12px;
+      padding: 18px;
+      font-size: 13px;
       color: #f87171;
       text-align: center;
+    }
+
+    /* ── Mobile ────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      .sidebar { width: 100%; height: auto; max-height: 280px; position: relative; }
+      .main { padding: 16px; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="logo">
+
+  <!-- ── Sidebar ───────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
         </svg>
       </div>
-      <h1>LinkedIn Profile Enricher</h1>
-      <p class="subtitle">Upload a CSV of LinkedIn URLs and get back<br>a fully enriched file with profile details.</p>
+      <div class="sidebar-title">Profile Enricher</div>
     </div>
 
-    <div class="card">
+    <button class="new-run-btn" id="newRunBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      New enrichment
+    </button>
 
-      <!-- Upload Zone -->
-      <div class="upload-zone" id="uploadZone">
-        <input type="file" id="fileInput" accept=".csv" />
-        <div class="upload-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
+    <div class="history-section-title">History</div>
+    <div class="history-list" id="historyList">
+      <div class="history-empty">
+        No runs yet.<br>Upload a CSV to start.
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ──────────────────────────────────────────── -->
+  <main class="main">
+    <div class="container">
+      <div class="header">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
           </svg>
         </div>
-        <div class="upload-title">Drop your CSV here</div>
-        <div class="upload-hint">or <span>browse to upload</span></div>
+        <h1>LinkedIn Profile Enricher</h1>
+        <p class="subtitle">Upload a CSV of LinkedIn URLs and get back<br>a fully enriched file with profile details.</p>
       </div>
 
-      <!-- File Selected -->
-      <div class="file-selected" id="fileSelected">
-        <div class="file-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-          </svg>
-        </div>
-        <div class="file-info">
-          <div class="file-name" id="fileName">—</div>
-          <div class="file-size" id="fileSize">—</div>
-        </div>
-        <button class="remove-file" id="removeFile" title="Remove file">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
+      <div class="card">
 
-      <!-- Format hint -->
-      <div class="format-hint">
-        <strong>Format:</strong> Your CSV must have a column containing LinkedIn profile URLs
-        (e.g. <code>https://linkedin.com/in/username</code>). Any column named
-        <em>linkedin_url</em>, <em>url</em>, <em>profile</em>, or <em>link</em> is
-        auto-detected. All your original columns are preserved in the output.
-      </div>
-
-      <!-- Submit -->
-      <button class="submit-btn" id="submitBtn" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        Enrich Profiles
-      </button>
-
-      <!-- Progress -->
-      <div class="progress-section" id="progressSection">
-        <div class="progress-header">
-          <span class="progress-label">Scraping profiles…</span>
-          <span class="progress-count" id="progressCount">0 / 0</span>
-        </div>
-        <div class="progress-bar-track">
-          <div class="progress-bar-fill" id="progressBar"></div>
-        </div>
-        <div class="status-text">
-          <div class="spinner"></div>
-          <span id="statusText">Starting…</span>
-        </div>
-      </div>
-
-      <!-- Done -->
-      <div class="done-section" id="doneSection">
-        <div class="done-card" id="doneCard">
-          <div class="done-icon">
-            <svg id="doneIconSvg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="20 6 9 17 4 12"/>
+        <!-- Upload Zone -->
+        <div class="upload-zone" id="uploadZone">
+          <input type="file" id="fileInput" accept=".csv" />
+          <div class="upload-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
           </div>
-          <div class="done-title" id="doneTitle">Enrichment complete!</div>
-          <div class="done-subtitle" id="doneSubtitle">—</div>
-          <div class="failed-urls" id="failedUrls" style="display:none"></div>
-          <a class="download-btn" id="downloadBtn" href="#" style="display:none">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Download Enriched CSV
-          </a>
-          <button class="reset-btn" id="resetBtn">Enrich another file</button>
+          <div class="upload-title">Drop your CSV here</div>
+          <div class="upload-hint">or <span>browse to upload</span></div>
         </div>
-      </div>
 
-      <!-- Error -->
-      <div class="error-section" id="errorSection">
-        <div class="error-card" id="errorMessage">An error occurred.</div>
-      </div>
+        <!-- File Selected -->
+        <div class="file-selected" id="fileSelected">
+          <div class="file-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+          </div>
+          <div class="file-info">
+            <div class="file-name" id="fileName">—</div>
+            <div class="file-size" id="fileSize">—</div>
+          </div>
+          <button class="remove-file" id="removeFile" title="Remove file">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
 
+        <div class="format-hint">
+          <strong>Format:</strong> CSV must have a column with LinkedIn URLs
+          (auto-detected from <em>linkedin_url</em>, <em>url</em>, <em>profile</em>, or <em>link</em>).
+          All your original columns are preserved in the output.
+        </div>
+
+        <button class="submit-btn" id="submitBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          Enrich Profiles
+        </button>
+
+        <!-- Progress -->
+        <div class="progress-section" id="progressSection">
+          <div class="progress-header">
+            <span class="progress-label">Scraping profiles…</span>
+            <span class="progress-count" id="progressCount">0 / 0</span>
+          </div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progressBar"></div>
+          </div>
+          <div class="status-text">
+            <div class="spinner"></div>
+            <span id="statusText">Starting…</span>
+          </div>
+        </div>
+
+        <!-- Done -->
+        <div class="done-section" id="doneSection">
+          <div class="done-card" id="doneCard">
+            <div class="done-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <div class="done-title" id="doneTitle">Enrichment complete!</div>
+            <div class="done-subtitle" id="doneSubtitle">—</div>
+            <div class="download-actions">
+              <a class="download-btn" id="downloadBtn" href="#">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Download Enriched CSV
+              </a>
+              <a class="download-btn secondary" id="downloadInputBtn" href="#">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                Original Input
+              </a>
+            </div>
+            <button class="reset-btn" id="resetBtn">Enrich another file</button>
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div class="error-section" id="errorSection">
+          <div class="error-card" id="errorMessage">An error occurred.</div>
+          <button class="reset-btn" id="errorResetBtn" style="margin-top: 14px;">Try again</button>
+        </div>
+
+      </div>
     </div>
-  </div>
+  </main>
 
   <script>
-    const fileInput    = document.getElementById("fileInput");
-    const uploadZone   = document.getElementById("uploadZone");
-    const fileSelected = document.getElementById("fileSelected");
-    const fileName     = document.getElementById("fileName");
-    const fileSize     = document.getElementById("fileSize");
-    const removeFile   = document.getElementById("removeFile");
-    const submitBtn    = document.getElementById("submitBtn");
+    // ── DOM refs ──────────────────────────────────────────
+    const fileInput     = document.getElementById("fileInput");
+    const uploadZone    = document.getElementById("uploadZone");
+    const fileSelected  = document.getElementById("fileSelected");
+    const fileName      = document.getElementById("fileName");
+    const fileSize      = document.getElementById("fileSize");
+    const removeFile    = document.getElementById("removeFile");
+    const submitBtn     = document.getElementById("submitBtn");
     const progressSection = document.getElementById("progressSection");
-    const progressBar  = document.getElementById("progressBar");
+    const progressBar   = document.getElementById("progressBar");
     const progressCount = document.getElementById("progressCount");
-    const statusText   = document.getElementById("statusText");
-    const doneSection  = document.getElementById("doneSection");
-    const doneCard     = document.getElementById("doneCard");
-    const doneTitle    = document.getElementById("doneTitle");
-    const doneIconSvg  = document.getElementById("doneIconSvg");
-    const doneSubtitle = document.getElementById("doneSubtitle");
-    const failedUrls   = document.getElementById("failedUrls");
-    const downloadBtn  = document.getElementById("downloadBtn");
-    const resetBtn     = document.getElementById("resetBtn");
-    const errorSection = document.getElementById("errorSection");
-    const errorMessage = document.getElementById("errorMessage");
+    const statusText    = document.getElementById("statusText");
+    const doneSection   = document.getElementById("doneSection");
+    const doneCard      = document.getElementById("doneCard");
+    const doneTitle     = document.getElementById("doneTitle");
+    const doneSubtitle  = document.getElementById("doneSubtitle");
+    const downloadBtn   = document.getElementById("downloadBtn");
+    const downloadInputBtn = document.getElementById("downloadInputBtn");
+    const resetBtn      = document.getElementById("resetBtn");
+    const errorResetBtn = document.getElementById("errorResetBtn");
+    const errorSection  = document.getElementById("errorSection");
+    const errorMessage  = document.getElementById("errorMessage");
+    const historyList   = document.getElementById("historyList");
+    const newRunBtn     = document.getElementById("newRunBtn");
 
     let selectedFile = null;
     let pollInterval = null;
+    let activeJobId = null;
 
+    // ── Helpers ───────────────────────────────────────────
     function formatBytes(bytes) {
       if (bytes < 1024) return bytes + " B";
       if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
       return (bytes / 1048576).toFixed(1) + " MB";
     }
 
+    function formatRelativeTime(isoString) {
+      if (!isoString) return "";
+      const d = new Date(isoString);
+      const now = new Date();
+      const diffMs = now - d;
+      const diffMin = Math.floor(diffMs / 60000);
+      const diffHr = Math.floor(diffMs / 3600000);
+      const diffDay = Math.floor(diffMs / 86400000);
+      if (diffMin < 1) return "just now";
+      if (diffMin < 60) return `${diffMin}m ago`;
+      if (diffHr < 24) return `${diffHr}h ago`;
+      if (diffDay < 7) return `${diffDay}d ago`;
+      return d.toLocaleDateString();
+    }
+
+    function getStatusInfo(job) {
+      const { status, total, matched, failed_count } = job;
+      if (status === "done") {
+        if (matched === 0) return { dot: "error", label: "0 enriched" };
+        if (failed_count > 0) return { dot: "partial", label: `${matched}/${total} enriched` };
+        return { dot: "done", label: `${matched}/${total} enriched` };
+      }
+      if (status === "error") return { dot: "error", label: "Failed" };
+      if (status === "queued") return { dot: "running", label: "Queued…" };
+      if (status === "reading") return { dot: "running", label: "Reading…" };
+      if (status === "scraping") return { dot: "running", label: `${job.progress || 0}/${total || "?"} scraping…` };
+      return { dot: "done", label: status };
+    }
+
+    // ── Sidebar / History ─────────────────────────────────
+    async function refreshHistory() {
+      try {
+        const res = await fetch("/history");
+        const list = await res.json();
+        renderHistory(list);
+        return list;
+      } catch (err) {
+        console.error("Failed to load history:", err);
+        return [];
+      }
+    }
+
+    function renderHistory(list) {
+      if (!list || list.length === 0) {
+        historyList.innerHTML = `<div class="history-empty">No runs yet.<br>Upload a CSV to start.</div>`;
+        return;
+      }
+
+      historyList.innerHTML = list.map(job => {
+        const info = getStatusInfo(job);
+        const isActive = job.job_id === activeJobId;
+        const filename = (job.filename || "untitled.csv").replace(/</g, "&lt;");
+        return `
+          <div class="history-item ${isActive ? "active" : ""}" data-job-id="${job.job_id}">
+            <div class="history-item-row">
+              <div class="status-dot ${info.dot}"></div>
+              <div class="history-item-name">${filename}</div>
+            </div>
+            <div class="history-item-meta">${info.label}</div>
+            <div class="history-item-time">${formatRelativeTime(job.created_at)}</div>
+            <button class="delete-btn" data-job-id="${job.job_id}" title="Delete">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+              </svg>
+            </button>
+          </div>
+        `;
+      }).join("");
+
+      // Attach click handlers
+      historyList.querySelectorAll(".history-item").forEach(el => {
+        el.addEventListener("click", (e) => {
+          if (e.target.closest(".delete-btn")) return;
+          const jobId = el.dataset.jobId;
+          openJob(jobId);
+        });
+      });
+
+      historyList.querySelectorAll(".delete-btn").forEach(el => {
+        el.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const jobId = el.dataset.jobId;
+          if (!confirm("Delete this run? Files will be removed.")) return;
+          try {
+            const res = await fetch(`/job/${jobId}`, { method: "DELETE" });
+            if (!res.ok) {
+              const data = await res.json();
+              alert(data.error || "Could not delete");
+              return;
+            }
+            if (activeJobId === jobId) {
+              activeJobId = null;
+              showUploadView();
+            }
+            refreshHistory();
+          } catch (err) {
+            alert("Could not delete: " + err.message);
+          }
+        });
+      });
+    }
+
+    async function openJob(jobId) {
+      activeJobId = jobId;
+      // Stop any current polling
+      if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+
+      // Hide upload, show progress/done section based on status
+      try {
+        const res = await fetch(`/status/${jobId}`);
+        const job = await res.json();
+        if (!res.ok) throw new Error(job.error || "Could not load job");
+        renderJobView(job);
+        // If still running, start polling
+        if (["queued", "reading", "scraping"].includes(job.status)) {
+          startPolling(jobId);
+        }
+      } catch (err) {
+        alert(err.message);
+      }
+      refreshHistory(); // Update active highlight
+    }
+
+    function renderJobView(job) {
+      // Reset all sections
+      progressSection.classList.remove("show");
+      doneSection.classList.remove("show");
+      errorSection.classList.remove("show");
+      fileSelected.classList.remove("show");
+      submitBtn.style.display = "none";
+      uploadZone.style.display = "none";
+      document.querySelector(".format-hint").style.display = "none";
+
+      const status = job.status;
+
+      if (["queued", "reading", "scraping"].includes(status)) {
+        progressSection.classList.add("show");
+        const statusLabels = {
+          queued: "Queued…",
+          reading: "Reading your CSV…",
+          scraping: "Calling LinkedIn via Apify…",
+        };
+        statusText.textContent = statusLabels[status] || status;
+        const total = job.total || 0;
+        const progress = job.progress || 0;
+        if (total > 0) {
+          progressBar.style.width = Math.round((progress / total) * 100) + "%";
+          progressCount.textContent = `${progress} / ${total}`;
+        } else {
+          progressBar.style.width = "0%";
+          progressCount.textContent = "0 / 0";
+        }
+      } else if (status === "done") {
+        doneSection.classList.add("show");
+        const { matched, total, failed_count } = job;
+        doneCard.classList.remove("partial", "none");
+        if (matched === 0) {
+          doneCard.classList.add("none");
+          doneTitle.textContent = "No profiles could be enriched";
+          doneSubtitle.textContent = "All URLs failed. LinkedIn may have blocked access.";
+        } else if (failed_count > 0) {
+          doneCard.classList.add("partial");
+          doneTitle.textContent = "Partial enrichment";
+          doneSubtitle.textContent = `${matched} of ${total} profiles enriched (${failed_count} failed)`;
+        } else {
+          doneTitle.textContent = "Enrichment complete!";
+          doneSubtitle.textContent = `All ${matched} profiles enriched successfully`;
+        }
+        downloadBtn.href = `/download/${job.job_id}`;
+        downloadInputBtn.href = `/download-input/${job.job_id}`;
+        downloadBtn.style.display = matched > 0 ? "" : "none";
+      } else if (status === "error") {
+        errorSection.classList.add("show");
+        errorMessage.textContent = job.error || "An unexpected error occurred.";
+      }
+    }
+
+    function showUploadView() {
+      activeJobId = null;
+      // Stop polling
+      if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+
+      // Reset all sections
+      progressSection.classList.remove("show");
+      doneSection.classList.remove("show");
+      errorSection.classList.remove("show");
+      fileSelected.classList.remove("show");
+
+      // Show upload form
+      uploadZone.style.display = "";
+      submitBtn.style.display = "";
+      document.querySelector(".format-hint").style.display = "";
+      submitBtn.disabled = true;
+      selectedFile = null;
+      fileInput.value = "";
+
+      refreshHistory();
+    }
+
+    // ── File handling ─────────────────────────────────────
     function setFile(file) {
       selectedFile = file;
       fileName.textContent = file.name;
@@ -541,20 +872,17 @@
       submitBtn.disabled = false;
     }
 
-    function clearFile() {
-      selectedFile = null;
-      fileInput.value = "";
-      fileSelected.classList.remove("show");
-      submitBtn.disabled = true;
-    }
-
     fileInput.addEventListener("change", () => {
       if (fileInput.files[0]) setFile(fileInput.files[0]);
     });
 
-    removeFile.addEventListener("click", clearFile);
+    removeFile.addEventListener("click", () => {
+      selectedFile = null;
+      fileInput.value = "";
+      fileSelected.classList.remove("show");
+      submitBtn.disabled = true;
+    });
 
-    // Drag & drop
     uploadZone.addEventListener("dragover", (e) => { e.preventDefault(); uploadZone.classList.add("dragover"); });
     uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("dragover"));
     uploadZone.addEventListener("drop", (e) => {
@@ -564,85 +892,28 @@
       if (file && file.name.endsWith(".csv")) setFile(file);
     });
 
-    // Status label map
-    const statusLabels = {
-      queued:   "Queued…",
-      reading:  "Reading your CSV…",
-      scraping: "Calling LinkedIn via Apify…",
-      done:     "Done!",
-      error:    "Error",
-    };
-
+    // ── Polling ───────────────────────────────────────────
     function startPolling(jobId) {
+      if (pollInterval) clearInterval(pollInterval);
       pollInterval = setInterval(async () => {
-        const res = await fetch(`/status/${jobId}`);
-        const data = await res.json();
-
-        const { status, progress, total, matched, error } = data;
-        statusText.textContent = statusLabels[status] || status;
-
-        if (total > 0) {
-          const pct = Math.round((progress / total) * 100);
-          progressBar.style.width = pct + "%";
-          progressCount.textContent = `${progress} / ${total}`;
-        }
-
-        if (status === "done") {
-          clearInterval(pollInterval);
-          progressSection.classList.remove("show");
-          doneSection.classList.add("show");
-
-          const failed = data.failed_urls || [];
-          const noneEnriched = matched === 0;
-          const partialEnriched = matched > 0 && matched < total;
-
-          // Reset card state
-          doneCard.classList.remove("partial", "none");
-          failedUrls.style.display = "none";
-          failedUrls.innerHTML = "";
-
-          if (noneEnriched) {
-            doneCard.classList.add("none");
-            doneTitle.textContent = "No profiles could be enriched";
-            doneIconSvg.innerHTML = '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>';
-            doneSubtitle.textContent = "LinkedIn may have restricted access to these profiles. They could be private or set to limited visibility.";
-            if (failed.length) {
-              failedUrls.style.display = "block";
-              failedUrls.innerHTML = "<strong>Could not scrape:</strong>" + failed.map(u => `<span>${u}</span>`).join("");
-            }
-            downloadBtn.style.display = "none";
-          } else if (partialEnriched) {
-            doneCard.classList.add("partial");
-            doneTitle.textContent = "Partially enriched";
-            doneIconSvg.innerHTML = '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>';
-            doneSubtitle.textContent = `${matched} of ${total} profiles enriched. ${failed.length} could not be scraped — they may be private or restricted.`;
-            if (failed.length) {
-              failedUrls.style.display = "block";
-              failedUrls.innerHTML = "<strong>Could not scrape:</strong>" + failed.map(u => `<span>${u}</span>`).join("");
-            }
-            downloadBtn.href = `/download/${jobId}`;
-            downloadBtn.style.display = "inline-flex";
-          } else {
-            doneTitle.textContent = "Enrichment complete!";
-            doneIconSvg.innerHTML = '<polyline points="20 6 9 17 4 12"/>';
-            doneSubtitle.textContent = `${matched} of ${total} profiles enriched successfully`;
-            downloadBtn.href = `/download/${jobId}`;
-            downloadBtn.style.display = "inline-flex";
+        try {
+          const res = await fetch(`/status/${jobId}`);
+          const job = await res.json();
+          renderJobView(job);
+          if (["done", "error"].includes(job.status)) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+            refreshHistory();
           }
-
-          submitBtn.disabled = false;
-        }
-
-        if (status === "error") {
-          clearInterval(pollInterval);
-          progressSection.classList.remove("show");
-          errorSection.classList.add("show");
-          errorMessage.textContent = error || "An unexpected error occurred.";
-          submitBtn.disabled = false;
+        } catch (err) {
+          console.error("Polling error:", err);
         }
       }, 2000);
+      // Also refresh sidebar periodically
+      refreshHistory();
     }
 
+    // ── Submit ────────────────────────────────────────────
     submitBtn.addEventListener("click", async () => {
       if (!selectedFile) return;
 
@@ -664,6 +935,12 @@
         const res = await fetch("/upload", { method: "POST", body: formData });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
+        activeJobId = data.job_id;
+        // Hide upload form, show progress
+        fileSelected.classList.remove("show");
+        uploadZone.style.display = "none";
+        submitBtn.style.display = "none";
+        document.querySelector(".format-hint").style.display = "none";
         startPolling(data.job_id);
       } catch (err) {
         progressSection.classList.remove("show");
@@ -673,11 +950,25 @@
       }
     });
 
-    resetBtn.addEventListener("click", () => {
-      clearFile();
-      doneSection.classList.remove("show");
-      errorSection.classList.remove("show");
-    });
+    resetBtn.addEventListener("click", showUploadView);
+    errorResetBtn.addEventListener("click", showUploadView);
+    newRunBtn.addEventListener("click", showUploadView);
+
+    // ── Init ──────────────────────────────────────────────
+    (async function init() {
+      const list = await refreshHistory();
+
+      // If there's an active running job, auto-open it
+      const runningJob = (list || []).find(j =>
+        ["queued", "reading", "scraping"].includes(j.status)
+      );
+      if (runningJob) {
+        openJob(runningJob.job_id);
+      }
+
+      // Refresh history every 5s to keep sidebar live
+      setInterval(refreshHistory, 5000);
+    })();
   </script>
 </body>
 </html>
