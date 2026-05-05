@@ -15,7 +15,15 @@ app.config["OUTPUT_FOLDER"] = "outputs"
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
 
 APIFY_TOKEN = os.getenv("APIFY_API_TOKEN")
-ACTOR_ID = "dev_fusion~Linkedin-Profile-Scraper"
+
+# Primary actor
+ACTOR_ID_PRIMARY = "dev_fusion~Linkedin-Profile-Scraper"
+ACTOR_INPUT_PRIMARY = "profileUrls"
+
+# Fallback actor
+ACTOR_ID_FALLBACK = "LpVuK3Zozwuipa5bp"
+ACTOR_INPUT_FALLBACK = "targetUrls"
+
 BASE_URL = "https://api.apify.com/v2"
 BATCH_SIZE = 10
 
@@ -38,12 +46,23 @@ jobs = {}
 
 # ── Scraping Logic ────────────────────────────────────────
 
-def scrape_batch(urls: list[str]) -> list[dict]:
+def scrape_batch_with_actor(urls: list[str], actor_id: str, input_field: str) -> list[dict]:
+    """Run a single Apify actor and return results."""
     params = {"token": APIFY_TOKEN}
-    run_url = f"{BASE_URL}/acts/{ACTOR_ID}/runs"
-    resp = http_requests.post(run_url, json={"profileUrls": urls},
-                              headers={"Content-Type": "application/json"}, params=params)
-    resp.raise_for_status()
+    run_url = f"{BASE_URL}/acts/{actor_id}/runs"
+    payload = {input_field: urls}
+
+    try:
+        resp = http_requests.post(run_url, json=payload,
+                                  headers={"Content-Type": "application/json"}, params=params)
+        resp.raise_for_status()
+    except http_requests.exceptions.HTTPError as e:
+        if e.response.status_code == 402:
+            print(f"  ⚠️  Actor {actor_id}: Out of credits (402)")
+        else:
+            print(f"  ⚠️  Actor {actor_id}: HTTP {e.response.status_code}")
+        return []
+
     run_id = resp.json()["data"]["id"]
 
     status_url = f"{BASE_URL}/actor-runs/{run_id}"
@@ -55,6 +74,7 @@ def scrape_batch(urls: list[str]) -> list[dict]:
         if status == "SUCCEEDED":
             break
         elif status in ("FAILED", "ABORTED", "TIMED-OUT"):
+            print(f"  ⚠️  Actor {actor_id}: Run {status}")
             return []
         time.sleep(3)
 
@@ -62,41 +82,79 @@ def scrape_batch(urls: list[str]) -> list[dict]:
     items_url = f"{BASE_URL}/datasets/{dataset_id}/items"
     resp = http_requests.get(items_url, params=params)
     resp.raise_for_status()
-    return resp.json()
+    results = resp.json()
+    return results if results else []
+
+
+def scrape_batch(urls: list[str]) -> list[dict]:
+    """Try primary actor, fallback to secondary if needed."""
+    print(f"  Trying primary actor: {ACTOR_ID_PRIMARY}")
+    results = scrape_batch_with_actor(urls, ACTOR_ID_PRIMARY, ACTOR_INPUT_PRIMARY)
+
+    if results and any(r.get("fullName") or r.get("firstName") for r in results):
+        print(f"  ✅ Primary actor succeeded")
+        return results
+
+    print(f"  Fallback: Trying secondary actor: {ACTOR_ID_FALLBACK}")
+    results = scrape_batch_with_actor(urls, ACTOR_ID_FALLBACK, ACTOR_INPUT_FALLBACK)
+
+    if results:
+        print(f"  ✅ Secondary actor succeeded")
+    else:
+        print(f"  ❌ Both actors failed")
+
+    return results
 
 
 def flatten_profile(profile: dict) -> dict:
     if not profile or "error" in profile:
         return {k: "" for k in get_scraped_columns()}
 
-    experiences = profile.get("experiences") or []
+    # Handle both actor output formats
+    # Actor 1 (dev_fusion): uses firstName, lastName, headline, experiences, educations, skills
+    # Actor 2 (LpVuK3Zozwuipa5bp): uses firstName, lastName, headline, workExperience, education, skills
+
+    # Normalize experiences
+    experiences = profile.get("experiences") or profile.get("workExperience") or []
     exp_lines = []
     for job in experiences:
         title = job.get("title", "")
-        company = job.get("companyName", "")
-        started = job.get("jobStartedOn", "")
-        ended = job.get("jobEndedOn") or ("Present" if job.get("jobStillWorking") else "")
+        company = job.get("companyName", "") or job.get("company", "")
+        started = job.get("jobStartedOn", "") or job.get("startedOn", "")
+        ended = job.get("jobEndedOn") or job.get("endedOn") or ("Present" if job.get("jobStillWorking") else "")
         period = f" ({started} - {ended})" if started else ""
         exp_lines.append(f"{title} @ {company}{period}")
 
-    educations = profile.get("educations") or []
+    # Normalize educations
+    educations = profile.get("educations") or profile.get("education") or []
     edu_lines = []
     for edu in educations:
-        school = edu.get("title", "")
-        degree = edu.get("subtitle", "")
+        school = edu.get("title", "") or edu.get("schoolName", "")
+        degree = edu.get("subtitle", "") or edu.get("degreeName", "")
         period = edu.get("period", {})
-        start_year = period.get("startedOn", {}).get("year", "")
-        end_year = period.get("endedOn", {}).get("year", "")
+        start_year = period.get("startedOn", {}).get("year", "") if isinstance(period, dict) else ""
+        end_year = period.get("endedOn", {}).get("year", "") if isinstance(period, dict) else ""
         yr = f" ({start_year}-{end_year})" if start_year or end_year else ""
         edu_lines.append(f"{school} — {degree}{yr}" if degree else f"{school}{yr}")
 
+    # Normalize skills
     skills = profile.get("skills") or []
-    skill_names = [s.get("title", str(s)) if isinstance(s, dict) else str(s) for s in skills]
+    skill_names = []
+    for s in skills:
+        if isinstance(s, dict):
+            skill_names.append(s.get("title", s.get("name", str(s))))
+        else:
+            skill_names.append(str(s))
+
+    # Build full name
+    first_name = profile.get("firstName", "")
+    last_name = profile.get("lastName", "")
+    full_name = profile.get("fullName", "") or f"{first_name} {last_name}".strip()
 
     return {
-        "full_name": profile.get("fullName", ""),
-        "first_name": profile.get("firstName", ""),
-        "last_name": profile.get("lastName", ""),
+        "full_name": full_name,
+        "first_name": first_name,
+        "last_name": last_name,
         "headline": profile.get("headline", ""),
         "current_job_title": profile.get("jobTitle", ""),
         "current_company": profile.get("companyName", ""),
@@ -105,17 +163,17 @@ def flatten_profile(profile: dict) -> dict:
         "current_company_website": profile.get("companyWebsite", ""),
         "current_job_location": profile.get("jobLocation", ""),
         "current_job_duration": profile.get("currentJobDuration", ""),
-        "location": profile.get("addressWithCountry", ""),
-        "country": profile.get("addressCountryOnly", ""),
+        "location": profile.get("addressWithCountry", "") or profile.get("location", {}).get("text", ""),
+        "country": profile.get("addressCountryOnly", "") or profile.get("location", {}).get("country", ""),
         "about": profile.get("about", ""),
         "email": profile.get("email", ""),
-        "phone": profile.get("mobileNumber", ""),
+        "phone": profile.get("mobileNumber", "") or profile.get("phoneNumber", ""),
         "connections": profile.get("connections", ""),
         "followers": profile.get("followers", ""),
         "total_experience_years": profile.get("totalExperienceYears", ""),
-        "is_premium": profile.get("isPremium", ""),
-        "is_verified": profile.get("isVerified", ""),
-        "is_creator": profile.get("isCreator", ""),
+        "is_premium": profile.get("isPremium", "") or profile.get("premium", ""),
+        "is_verified": profile.get("isVerified", "") or profile.get("verified", ""),
+        "is_creator": profile.get("isCreator", "") or profile.get("creator", ""),
         "experiences": " | ".join(exp_lines),
         "education": " | ".join(edu_lines),
         "skills": ", ".join(skill_names),
