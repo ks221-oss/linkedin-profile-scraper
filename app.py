@@ -50,6 +50,50 @@ jobs = {}
 
 # ── Scraping Logic ────────────────────────────────────────
 
+# Retry config for handling transient API errors (502, 503, 504, connection errors)
+MAX_RETRIES = 5
+RETRY_BACKOFF_SEC = [2, 5, 10, 20, 30]  # Exponential backoff
+TRANSIENT_STATUS_CODES = (500, 502, 503, 504, 408, 429)
+
+
+def apify_request(method: str, url: str, **kwargs):
+    """Make an Apify API request with retry logic for transient failures.
+    Retries on 5xx errors, 429 rate limits, 408 timeouts, and connection errors.
+    Returns the response object if successful, raises the last exception if all retries fail.
+    """
+    last_exception = None
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = http_requests.request(method, url, timeout=30, **kwargs)
+
+            # If transient error, retry
+            if resp.status_code in TRANSIENT_STATUS_CODES:
+                wait = RETRY_BACKOFF_SEC[min(attempt, len(RETRY_BACKOFF_SEC) - 1)]
+                print(f"  ⚠️  Apify API returned {resp.status_code}, retrying in {wait}s "
+                      f"(attempt {attempt + 1}/{MAX_RETRIES})")
+                time.sleep(wait)
+                continue
+
+            # Success or non-retryable error - return immediately
+            return resp
+
+        except (http_requests.exceptions.ConnectionError,
+                http_requests.exceptions.Timeout,
+                http_requests.exceptions.ChunkedEncodingError) as e:
+            last_exception = e
+            wait = RETRY_BACKOFF_SEC[min(attempt, len(RETRY_BACKOFF_SEC) - 1)]
+            print(f"  ⚠️  Connection error: {type(e).__name__}, retrying in {wait}s "
+                  f"(attempt {attempt + 1}/{MAX_RETRIES})")
+            time.sleep(wait)
+
+    # All retries exhausted
+    if last_exception:
+        raise last_exception
+    # If we got transient HTTP errors all the way through, return the last response
+    return resp
+
+
 def scrape_batch_with_actor(urls: list[str], actor_id: str, payload_builder) -> list[dict]:
     """Run a single Apify actor and return results."""
     params = {"token": APIFY_TOKEN}
@@ -57,8 +101,8 @@ def scrape_batch_with_actor(urls: list[str], actor_id: str, payload_builder) -> 
     payload = payload_builder(urls)
 
     try:
-        resp = http_requests.post(run_url, json=payload,
-                                  headers={"Content-Type": "application/json"}, params=params)
+        resp = apify_request("POST", run_url, json=payload,
+                             headers={"Content-Type": "application/json"}, params=params)
         resp.raise_for_status()
     except http_requests.exceptions.HTTPError as e:
         if e.response.status_code == 402:
@@ -66,13 +110,29 @@ def scrape_batch_with_actor(urls: list[str], actor_id: str, payload_builder) -> 
         else:
             print(f"  ⚠️  Actor {actor_id}: HTTP {e.response.status_code}")
         return []
+    except Exception as e:
+        print(f"  ⚠️  Actor {actor_id}: Failed to start run - {type(e).__name__}: {e}")
+        return []
 
     run_id = resp.json()["data"]["id"]
+    print(f"  Started run: {run_id}")
 
     status_url = f"{BASE_URL}/actor-runs/{run_id}"
+    poll_count = 0
     while True:
-        resp = http_requests.get(status_url, params=params)
-        resp.raise_for_status()
+        try:
+            resp = apify_request("GET", status_url, params=params)
+            resp.raise_for_status()
+        except Exception as e:
+            # If polling fails after retries, log and try again on next iteration
+            print(f"  ⚠️  Polling error (will retry): {type(e).__name__}: {e}")
+            time.sleep(5)
+            poll_count += 1
+            if poll_count > 60:  # Give up after ~3+ minutes of polling failures
+                print(f"  ❌ Gave up polling after {poll_count} failed attempts")
+                return []
+            continue
+
         run_info = resp.json()["data"]
         status = run_info["status"]
         if status == "SUCCEEDED":
@@ -84,10 +144,14 @@ def scrape_batch_with_actor(urls: list[str], actor_id: str, payload_builder) -> 
 
     dataset_id = run_info["defaultDatasetId"]
     items_url = f"{BASE_URL}/datasets/{dataset_id}/items"
-    resp = http_requests.get(items_url, params=params)
-    resp.raise_for_status()
-    results = resp.json()
-    return results if results else []
+    try:
+        resp = apify_request("GET", items_url, params=params)
+        resp.raise_for_status()
+        results = resp.json()
+        return results if results else []
+    except Exception as e:
+        print(f"  ⚠️  Failed to fetch results: {type(e).__name__}: {e}")
+        return []
 
 
 def scrape_batch(urls: list[str]) -> list[dict]:
@@ -289,7 +353,23 @@ def process_job(job_id: str, input_path: str, output_path: str):
 
     except Exception as e:
         jobs[job_id]["status"] = "error"
-        jobs[job_id]["error"] = str(e)
+        # Provide user-friendly error messages for common issues
+        err_str = str(e)
+        if "502" in err_str or "Bad Gateway" in err_str:
+            jobs[job_id]["error"] = "Apify's servers are temporarily unavailable (502). Please try again in a minute."
+        elif "503" in err_str or "Service Unavailable" in err_str:
+            jobs[job_id]["error"] = "Apify service is temporarily down (503). Please try again shortly."
+        elif "504" in err_str or "Gateway Timeout" in err_str:
+            jobs[job_id]["error"] = "Apify request timed out (504). Please try again with a smaller batch."
+        elif "402" in err_str or "Payment Required" in err_str:
+            jobs[job_id]["error"] = "Apify account is out of credits. Please check your billing."
+        elif "401" in err_str or "Unauthorized" in err_str:
+            jobs[job_id]["error"] = "Apify API token is invalid or expired."
+        elif "Connection" in err_str or "Timeout" in err_str:
+            jobs[job_id]["error"] = "Network connection issue. Please check your internet and try again."
+        else:
+            jobs[job_id]["error"] = f"Unexpected error: {err_str}"
+        print(f"  ❌ Job {job_id} failed: {err_str}")
     finally:
         # Clean up input file
         if os.path.exists(input_path):
