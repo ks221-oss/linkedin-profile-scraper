@@ -16,13 +16,17 @@ app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
 
 APIFY_TOKEN = os.getenv("APIFY_API_TOKEN")
 
-# Primary actor
+# Primary actor (dev_fusion)
 ACTOR_ID_PRIMARY = "dev_fusion~Linkedin-Profile-Scraper"
-ACTOR_INPUT_PRIMARY = "profileUrls"
+ACTOR_PAYLOAD_PRIMARY = lambda urls: {"profileUrls": urls}
 
-# Fallback actor
+# Fallback actor (harvestapi/linkedin-profile-scraper)
+# Uses 'queries' field (not 'targetUrls' - that's the UI label) and requires profileScraperMode
 ACTOR_ID_FALLBACK = "LpVuK3Zozwuipa5bp"
-ACTOR_INPUT_FALLBACK = "targetUrls"
+ACTOR_PAYLOAD_FALLBACK = lambda urls: {
+    "queries": urls,
+    "profileScraperMode": "Profile details no email ($4 per 1k)"
+}
 
 BASE_URL = "https://api.apify.com/v2"
 BATCH_SIZE = 10
@@ -46,11 +50,11 @@ jobs = {}
 
 # ── Scraping Logic ────────────────────────────────────────
 
-def scrape_batch_with_actor(urls: list[str], actor_id: str, input_field: str) -> list[dict]:
+def scrape_batch_with_actor(urls: list[str], actor_id: str, payload_builder) -> list[dict]:
     """Run a single Apify actor and return results."""
     params = {"token": APIFY_TOKEN}
     run_url = f"{BASE_URL}/acts/{actor_id}/runs"
-    payload = {input_field: urls}
+    payload = payload_builder(urls)
 
     try:
         resp = http_requests.post(run_url, json=payload,
@@ -89,17 +93,21 @@ def scrape_batch_with_actor(urls: list[str], actor_id: str, input_field: str) ->
 def scrape_batch(urls: list[str]) -> list[dict]:
     """Try primary actor, fallback to secondary if needed."""
     print(f"  Trying primary actor: {ACTOR_ID_PRIMARY}")
-    results = scrape_batch_with_actor(urls, ACTOR_ID_PRIMARY, ACTOR_INPUT_PRIMARY)
+    results = scrape_batch_with_actor(urls, ACTOR_ID_PRIMARY, ACTOR_PAYLOAD_PRIMARY)
 
-    if results and any(r.get("fullName") or r.get("firstName") for r in results):
-        print(f"  ✅ Primary actor succeeded")
+    # Check if primary actor returned valid data (not just empty results)
+    has_valid_data = results and any(r.get("fullName") or r.get("firstName") for r in results)
+
+    if has_valid_data:
+        print(f"  ✅ Primary actor succeeded with {len(results)} profiles")
         return results
 
-    print(f"  Fallback: Trying secondary actor: {ACTOR_ID_FALLBACK}")
-    results = scrape_batch_with_actor(urls, ACTOR_ID_FALLBACK, ACTOR_INPUT_FALLBACK)
+    print(f"  ⚠️  Primary actor returned no valid data. Trying fallback...")
+    print(f"  Trying fallback actor: {ACTOR_ID_FALLBACK}")
+    results = scrape_batch_with_actor(urls, ACTOR_ID_FALLBACK, ACTOR_PAYLOAD_FALLBACK)
 
-    if results:
-        print(f"  ✅ Secondary actor succeeded")
+    if results and any(r.get("fullName") or r.get("firstName") for r in results):
+        print(f"  ✅ Fallback actor succeeded with {len(results)} profiles")
     else:
         print(f"  ❌ Both actors failed")
 
