@@ -186,6 +186,7 @@ def process_job(job_id: str, input_path: str, output_path: str):
         output_headers = list(input_headers) + [f"scraped_{c}" for c in scraped_cols]
 
         matched = 0
+        failed_urls = []
         output_rows = []
         for row, url in zip(rows, urls):
             out_row = dict(row)
@@ -202,6 +203,9 @@ def process_job(job_id: str, input_path: str, output_path: str):
                 if profile and "error" not in profile:
                     flat = flatten_profile(profile)
                     matched += 1
+                else:
+                    failed_urls.append(url)
+                    print(f"  [no data] {url}")
 
             for col in scraped_cols:
                 out_row[f"scraped_{col}"] = flat.get(col, "")
@@ -214,6 +218,7 @@ def process_job(job_id: str, input_path: str, output_path: str):
 
         jobs[job_id]["status"] = "done"
         jobs[job_id]["matched"] = matched
+        jobs[job_id]["failed_urls"] = failed_urls
         jobs[job_id]["output_file"] = output_path
 
     except Exception as e:

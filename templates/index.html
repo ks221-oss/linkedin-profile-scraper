@@ -279,6 +279,16 @@
       text-align: center;
     }
 
+    .done-card.partial {
+      background: rgba(245, 158, 11, 0.08);
+      border-color: rgba(245, 158, 11, 0.25);
+    }
+
+    .done-card.none {
+      background: rgba(239, 68, 68, 0.08);
+      border-color: rgba(239, 68, 68, 0.25);
+    }
+
     .done-icon {
       width: 48px;
       height: 48px;
@@ -290,7 +300,17 @@
       margin: 0 auto 12px;
     }
 
+    .done-card.partial .done-icon {
+      background: rgba(245, 158, 11, 0.15);
+    }
+
+    .done-card.none .done-icon {
+      background: rgba(239, 68, 68, 0.15);
+    }
+
     .done-icon svg { width: 24px; height: 24px; stroke: #10b981; }
+    .done-card.partial .done-icon svg { stroke: #f59e0b; }
+    .done-card.none .done-icon svg { stroke: #ef4444; }
 
     .done-title {
       font-size: 17px;
@@ -304,6 +324,21 @@
       color: #64748b;
       margin-bottom: 20px;
     }
+
+    .failed-urls {
+      margin: 0 0 16px;
+      text-align: left;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #94a3b8;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    .failed-urls strong { color: #cbd5e1; display: block; margin-bottom: 4px; }
+    .failed-urls span { display: block; color: #64748b; word-break: break-all; }
 
     .download-btn {
       display: inline-flex;
@@ -437,15 +472,16 @@
 
       <!-- Done -->
       <div class="done-section" id="doneSection">
-        <div class="done-card">
+        <div class="done-card" id="doneCard">
           <div class="done-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg id="doneIconSvg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           </div>
-          <div class="done-title">Enrichment complete!</div>
+          <div class="done-title" id="doneTitle">Enrichment complete!</div>
           <div class="done-subtitle" id="doneSubtitle">—</div>
-          <a class="download-btn" id="downloadBtn" href="#">
+          <div class="failed-urls" id="failedUrls" style="display:none"></div>
+          <a class="download-btn" id="downloadBtn" href="#" style="display:none">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
@@ -478,7 +514,11 @@
     const progressCount = document.getElementById("progressCount");
     const statusText   = document.getElementById("statusText");
     const doneSection  = document.getElementById("doneSection");
+    const doneCard     = document.getElementById("doneCard");
+    const doneTitle    = document.getElementById("doneTitle");
+    const doneIconSvg  = document.getElementById("doneIconSvg");
     const doneSubtitle = document.getElementById("doneSubtitle");
+    const failedUrls   = document.getElementById("failedUrls");
     const downloadBtn  = document.getElementById("downloadBtn");
     const resetBtn     = document.getElementById("resetBtn");
     const errorSection = document.getElementById("errorSection");
@@ -551,8 +591,45 @@
           clearInterval(pollInterval);
           progressSection.classList.remove("show");
           doneSection.classList.add("show");
-          doneSubtitle.textContent = `${matched} of ${total} profiles enriched successfully`;
-          downloadBtn.href = `/download/${jobId}`;
+
+          const failed = data.failed_urls || [];
+          const noneEnriched = matched === 0;
+          const partialEnriched = matched > 0 && matched < total;
+
+          // Reset card state
+          doneCard.classList.remove("partial", "none");
+          failedUrls.style.display = "none";
+          failedUrls.innerHTML = "";
+
+          if (noneEnriched) {
+            doneCard.classList.add("none");
+            doneTitle.textContent = "No profiles could be enriched";
+            doneIconSvg.innerHTML = '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>';
+            doneSubtitle.textContent = "LinkedIn may have restricted access to these profiles. They could be private or set to limited visibility.";
+            if (failed.length) {
+              failedUrls.style.display = "block";
+              failedUrls.innerHTML = "<strong>Could not scrape:</strong>" + failed.map(u => `<span>${u}</span>`).join("");
+            }
+            downloadBtn.style.display = "none";
+          } else if (partialEnriched) {
+            doneCard.classList.add("partial");
+            doneTitle.textContent = "Partially enriched";
+            doneIconSvg.innerHTML = '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>';
+            doneSubtitle.textContent = `${matched} of ${total} profiles enriched. ${failed.length} could not be scraped — they may be private or restricted.`;
+            if (failed.length) {
+              failedUrls.style.display = "block";
+              failedUrls.innerHTML = "<strong>Could not scrape:</strong>" + failed.map(u => `<span>${u}</span>`).join("");
+            }
+            downloadBtn.href = `/download/${jobId}`;
+            downloadBtn.style.display = "inline-flex";
+          } else {
+            doneTitle.textContent = "Enrichment complete!";
+            doneIconSvg.innerHTML = '<polyline points="20 6 9 17 4 12"/>';
+            doneSubtitle.textContent = `${matched} of ${total} profiles enriched successfully`;
+            downloadBtn.href = `/download/${jobId}`;
+            downloadBtn.style.display = "inline-flex";
+          }
+
           submitBtn.disabled = false;
         }
 
