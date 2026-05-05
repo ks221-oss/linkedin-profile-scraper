@@ -213,7 +213,9 @@ def scrape_batch_with_actor(urls: list[str], actor_id: str, payload_builder) -> 
 
 
 def scrape_batch(urls: list[str]) -> list[dict]:
-    """Try primary actor, fallback to secondary if needed."""
+    """Try primary actor, fallback to secondary if needed.
+    Tags each profile with `_source_actor` so we know which actor produced the data.
+    """
     print(f"  Trying primary actor: {ACTOR_ID_PRIMARY}")
     results = scrape_batch_with_actor(urls, ACTOR_ID_PRIMARY, ACTOR_PAYLOAD_PRIMARY)
 
@@ -222,6 +224,8 @@ def scrape_batch(urls: list[str]) -> list[dict]:
 
     if has_valid_data:
         print(f"  ✅ Primary actor succeeded with {len(results)} profiles")
+        for r in results:
+            r["_source_actor"] = "primary"
         return results
 
     print(f"  ⚠️  Primary actor returned no valid data. Trying fallback...")
@@ -230,96 +234,66 @@ def scrape_batch(urls: list[str]) -> list[dict]:
 
     if results and any(r.get("fullName") or r.get("firstName") for r in results):
         print(f"  ✅ Fallback actor succeeded with {len(results)} profiles")
+        for r in results:
+            r["_source_actor"] = "fallback"
     else:
         print(f"  ❌ Both actors failed")
 
     return results
 
 
-def flatten_profile(profile: dict) -> dict:
-    if not profile or "error" in profile:
-        return {k: "" for k in get_scraped_columns()}
+def flatten_value(value):
+    """Convert any value to a CSV-friendly string."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float, str)):
+        return str(value)
+    if isinstance(value, list):
+        if not value:
+            return ""
+        # If list of primitives, join with comma
+        if all(not isinstance(v, (dict, list)) for v in value):
+            return ", ".join(str(v) for v in value if v is not None)
+        # List of dicts/lists - serialize as JSON
+        return json.dumps(value, ensure_ascii=False, default=str)
+    if isinstance(value, dict):
+        return json.dumps(value, ensure_ascii=False, default=str)
+    return str(value)
 
-    # Handle both actor output formats
-    # Actor 1 (dev_fusion): uses firstName, lastName, headline, experiences, educations, skills
-    # Actor 2 (LpVuK3Zozwuipa5bp): uses firstName, lastName, headline, workExperience, education, skills
 
-    # Normalize experiences
-    experiences = profile.get("experiences") or profile.get("workExperience") or []
-    exp_lines = []
-    for job in experiences:
-        title = job.get("title", "")
-        company = job.get("companyName", "") or job.get("company", "")
-        started = job.get("jobStartedOn", "") or job.get("startedOn", "")
-        ended = job.get("jobEndedOn") or job.get("endedOn") or ("Present" if job.get("jobStillWorking") else "")
-        period = f" ({started} - {ended})" if started else ""
-        exp_lines.append(f"{title} @ {company}{period}")
+def flatten_profile_native(profile: dict) -> dict:
+    """Flatten a profile preserving the actor's NATIVE field names.
+    - Top-level scalars: kept as-is
+    - Nested dicts: flattened with dot notation (e.g., 'location.country')
+    - Arrays: serialized as JSON strings (preserves all data)
+    - Internal fields starting with '_' are skipped
+    """
+    if not profile:
+        return {}
 
-    # Normalize educations
-    educations = profile.get("educations") or profile.get("education") or []
-    edu_lines = []
-    for edu in educations:
-        school = edu.get("title", "") or edu.get("schoolName", "")
-        degree = edu.get("subtitle", "") or edu.get("degreeName", "")
-        period = edu.get("period", {})
-        start_year = period.get("startedOn", {}).get("year", "") if isinstance(period, dict) else ""
-        end_year = period.get("endedOn", {}).get("year", "") if isinstance(period, dict) else ""
-        yr = f" ({start_year}-{end_year})" if start_year or end_year else ""
-        edu_lines.append(f"{school} — {degree}{yr}" if degree else f"{school}{yr}")
+    result = {}
+    for key, value in profile.items():
+        if key.startswith("_"):  # Skip internal tags like _source_actor
+            continue
 
-    # Normalize skills
-    skills = profile.get("skills") or []
-    skill_names = []
-    for s in skills:
-        if isinstance(s, dict):
-            skill_names.append(s.get("title", s.get("name", str(s))))
+        if isinstance(value, dict):
+            # Flatten nested dicts with dot notation
+            for sub_key, sub_value in value.items():
+                col_name = f"{key}.{sub_key}"
+                if isinstance(sub_value, (dict, list)):
+                    result[col_name] = flatten_value(sub_value)
+                else:
+                    result[col_name] = "" if sub_value is None else (
+                        "true" if sub_value is True else
+                        "false" if sub_value is False else
+                        str(sub_value)
+                    )
         else:
-            skill_names.append(str(s))
+            result[key] = flatten_value(value)
 
-    # Build full name
-    first_name = profile.get("firstName", "")
-    last_name = profile.get("lastName", "")
-    full_name = profile.get("fullName", "") or f"{first_name} {last_name}".strip()
-
-    return {
-        "full_name": full_name,
-        "first_name": first_name,
-        "last_name": last_name,
-        "headline": profile.get("headline", ""),
-        "current_job_title": profile.get("jobTitle", ""),
-        "current_company": profile.get("companyName", ""),
-        "current_company_industry": profile.get("companyIndustry", ""),
-        "current_company_size": profile.get("companySize", ""),
-        "current_company_website": profile.get("companyWebsite", ""),
-        "current_job_location": profile.get("jobLocation", ""),
-        "current_job_duration": profile.get("currentJobDuration", ""),
-        "location": profile.get("addressWithCountry", "") or profile.get("location", {}).get("text", ""),
-        "country": profile.get("addressCountryOnly", "") or profile.get("location", {}).get("country", ""),
-        "about": profile.get("about", ""),
-        "email": profile.get("email", ""),
-        "phone": profile.get("mobileNumber", "") or profile.get("phoneNumber", ""),
-        "connections": profile.get("connections", ""),
-        "followers": profile.get("followers", ""),
-        "total_experience_years": profile.get("totalExperienceYears", ""),
-        "is_premium": profile.get("isPremium", "") or profile.get("premium", ""),
-        "is_verified": profile.get("isVerified", "") or profile.get("verified", ""),
-        "is_creator": profile.get("isCreator", "") or profile.get("creator", ""),
-        "experiences": " | ".join(exp_lines),
-        "education": " | ".join(edu_lines),
-        "skills": ", ".join(skill_names),
-    }
-
-
-def get_scraped_columns():
-    return [
-        "full_name", "first_name", "last_name", "headline",
-        "current_job_title", "current_company", "current_company_industry",
-        "current_company_size", "current_company_website", "current_job_location",
-        "current_job_duration", "location", "country", "about", "email", "phone",
-        "connections", "followers", "total_experience_years",
-        "is_premium", "is_verified", "is_creator",
-        "experiences", "education", "skills",
-    ]
+    return result
 
 
 def find_url_column(headers):
@@ -368,16 +342,41 @@ def process_job(job_id: str, input_path: str, output_path: str):
             scraped += len(batch)
             update_job(job_id, progress=scraped)
 
-        # Build output
-        scraped_cols = get_scraped_columns()
-        output_headers = list(input_headers) + [f"scraped_{c}" for c in scraped_cols]
+        # ── Build output with NATIVE actor fields ──────────────────
+        # First pass: flatten each profile, collecting all unique columns
+        # (so the CSV has the union of all native fields actually used)
+        flattened_profiles = {}
+        all_scraped_cols = []  # Preserve insertion order
+        seen_cols = set()
+        actors_used = set()
+
+        for url_key, profile in all_profiles.items():
+            if "error" in profile:
+                continue
+            actors_used.add(profile.get("_source_actor", "primary"))
+            flat = flatten_profile_native(profile)
+            flattened_profiles[url_key] = flat
+            # Collect new column names in the order they first appear
+            for col in flat.keys():
+                if col not in seen_cols:
+                    seen_cols.add(col)
+                    all_scraped_cols.append(col)
+
+        print(f"  Actors used in this job: {actors_used}")
+        print(f"  Native columns from JSON: {len(all_scraped_cols)}")
+
+        # Build output headers: original input cols + scraped_<native_field> + _source_actor
+        output_headers = list(input_headers) + [f"scraped_{c}" for c in all_scraped_cols]
+        if len(actors_used) > 0:
+            output_headers.append("scraped__source_actor")
 
         matched = 0
         failed_urls = []
         output_rows = []
         for row, url in zip(rows, urls):
             out_row = dict(row)
-            flat = {c: "" for c in scraped_cols}
+            flat = {}
+            source_actor = ""
 
             # Replace the original URL column with the cleaned URL
             if url and "linkedin.com/in/" in url:
@@ -388,18 +387,26 @@ def process_job(job_id: str, input_path: str, output_path: str):
                     pub_id = url.rstrip("/").split("/in/")[-1]
                     profile = all_profiles.get(pub_id)
                 if profile and "error" not in profile:
-                    flat = flatten_profile(profile)
+                    flat = flattened_profiles.get(url) or flattened_profiles.get(
+                        url.rstrip("/").split("/in/")[-1] if "/in/" in url else ""
+                    )
+                    if not flat:
+                        # Re-flatten if not in cache (edge case)
+                        flat = flatten_profile_native(profile)
+                    source_actor = profile.get("_source_actor", "primary")
                     matched += 1
                 else:
                     failed_urls.append(url)
                     print(f"  [no data] {url}")
 
-            for col in scraped_cols:
+            for col in all_scraped_cols:
                 out_row[f"scraped_{col}"] = flat.get(col, "")
+            if "scraped__source_actor" in output_headers:
+                out_row["scraped__source_actor"] = source_actor
             output_rows.append(out_row)
 
         with open(output_path, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=output_headers)
+            writer = csv.DictWriter(f, fieldnames=output_headers, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(output_rows)
 
