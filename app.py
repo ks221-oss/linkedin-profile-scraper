@@ -242,58 +242,246 @@ def scrape_batch(urls: list[str]) -> list[dict]:
     return results
 
 
-def flatten_value(value):
-    """Convert any value to a CSV-friendly string."""
-    if value is None:
-        return ""
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, (int, float, str)):
-        return str(value)
-    if isinstance(value, list):
-        if not value:
-            return ""
-        # If list of primitives, join with comma
-        if all(not isinstance(v, (dict, list)) for v in value):
-            return ", ".join(str(v) for v in value if v is not None)
-        # List of dicts/lists - serialize as JSON
-        return json.dumps(value, ensure_ascii=False, default=str)
-    if isinstance(value, dict):
-        return json.dumps(value, ensure_ascii=False, default=str)
-    return str(value)
+# ── Normalization helpers ──────────────────────────────────
+
+MONTH_TO_NUM = {
+    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12,
+}
 
 
-def flatten_profile_native(profile: dict) -> dict:
-    """Flatten a profile preserving the actor's NATIVE field names.
-    - Top-level scalars: kept as-is
-    - Nested dicts: flattened with dot notation (e.g., 'location.country')
-    - Arrays: serialized as JSON strings (preserves all data)
-    - Internal fields starting with '_' are skipped
+def _format_date_short(date_obj):
+    """Convert a fallback-actor date object to 'M-YYYY' string.
+    Examples:
+      {"month": "Nov", "year": 2025, "text": "Nov 2025"} → "11-2025"
+      {"text": "Present"} → "Present"
+      {"month": null, "year": 2019, "text": "2019"} → "2019"
     """
-    if not profile:
-        return {}
+    if not isinstance(date_obj, dict):
+        return ""
+    text = date_obj.get("text", "")
+    if text == "Present":
+        return "Present"
+    month = date_obj.get("month")
+    year = date_obj.get("year")
+    if month and year:
+        m_num = MONTH_TO_NUM.get(month, "")
+        return f"{m_num}-{year}" if m_num else str(year)
+    if year:
+        return str(year)
+    return text or ""
 
-    result = {}
-    for key, value in profile.items():
-        if key.startswith("_"):  # Skip internal tags like _source_actor
+
+def _format_year(date_obj):
+    """Extract just the year from a date dict."""
+    if not isinstance(date_obj, dict):
+        return ""
+    year = date_obj.get("year")
+    if year:
+        return str(year)
+    return date_obj.get("text", "") or ""
+
+
+def format_experiences(profile: dict) -> str:
+    """Format the experiences/experience field as a human-readable string.
+    Output: 'Title @ Company (M-YYYY - M-YYYY) | Title @ Company (M-YYYY - Present)'
+    Handles both primary (dev_fusion) and fallback (harvestapi) formats.
+    """
+    # Primary actor uses 'experiences', fallback uses 'experience'
+    experiences = profile.get("experiences") or profile.get("experience") or []
+    if not isinstance(experiences, list):
+        return ""
+
+    lines = []
+    for job in experiences:
+        if not isinstance(job, dict):
             continue
 
-        if isinstance(value, dict):
-            # Flatten nested dicts with dot notation
-            for sub_key, sub_value in value.items():
-                col_name = f"{key}.{sub_key}"
-                if isinstance(sub_value, (dict, list)):
-                    result[col_name] = flatten_value(sub_value)
-                else:
-                    result[col_name] = "" if sub_value is None else (
-                        "true" if sub_value is True else
-                        "false" if sub_value is False else
-                        str(sub_value)
-                    )
-        else:
-            result[key] = flatten_value(value)
+        # Primary: title; Fallback: position
+        title = job.get("title") or job.get("position") or ""
+        company = job.get("companyName") or job.get("company") or ""
 
-    return result
+        # Primary: jobStartedOn is already 'M-YYYY' string
+        # Fallback: startDate is a dict
+        if isinstance(job.get("startDate"), dict):
+            started = _format_date_short(job["startDate"])
+            ended = _format_date_short(job.get("endDate")) if job.get("endDate") else ""
+        else:
+            started = job.get("jobStartedOn", "") or ""
+            ended = job.get("jobEndedOn") or ("Present" if job.get("jobStillWorking") else "")
+
+        period = f" ({started} - {ended})" if started else ""
+        if title or company:
+            lines.append(f"{title} @ {company}{period}".strip())
+
+    return " | ".join(lines)
+
+
+def format_education(profile: dict) -> str:
+    """Format the education/educations field as a human-readable string.
+    Output: 'School — Degree, FieldOfStudy (YYYY-YYYY) | ...'
+    """
+    # Primary actor uses 'educations', fallback uses 'education'
+    educations = profile.get("educations") or profile.get("education") or []
+    if not isinstance(educations, list):
+        return ""
+
+    lines = []
+    for edu in educations:
+        if not isinstance(edu, dict):
+            continue
+
+        # Primary: title (school) + subtitle (degree)
+        # Fallback: schoolName + degree + fieldOfStudy
+        school = edu.get("schoolName") or edu.get("title") or ""
+        degree = edu.get("degree") or edu.get("subtitle") or ""
+        field = edu.get("fieldOfStudy", "") or ""
+
+        # Combine degree + field of study for fallback actor
+        if degree and field:
+            degree_str = f"{degree}, {field}"
+        else:
+            degree_str = degree or field
+
+        # Year range
+        if isinstance(edu.get("startDate"), dict) or isinstance(edu.get("endDate"), dict):
+            # Fallback format
+            start_year = _format_year(edu.get("startDate"))
+            end_year = _format_year(edu.get("endDate"))
+        else:
+            # Primary format
+            period = edu.get("period", {}) if isinstance(edu.get("period"), dict) else {}
+            start_year = (period.get("startedOn", {}) or {}).get("year", "") if isinstance(period.get("startedOn"), dict) else ""
+            end_year = (period.get("endedOn", {}) or {}).get("year", "") if isinstance(period.get("endedOn"), dict) else ""
+
+        year_range = f" ({start_year}-{end_year})" if start_year or end_year else ""
+
+        if school and degree_str:
+            lines.append(f"{school} — {degree_str}{year_range}")
+        elif school:
+            lines.append(f"{school}{year_range}")
+
+    return " | ".join(lines)
+
+
+def format_skills(profile: dict) -> str:
+    """Format skills as a comma-separated list of skill names.
+    Output: 'Skill 1, Skill 2, Skill 3'
+    """
+    skills = profile.get("skills") or []
+    if not isinstance(skills, list):
+        return ""
+
+    names = []
+    for s in skills:
+        if isinstance(s, dict):
+            # Primary uses 'title', fallback uses 'name'
+            name = s.get("name") or s.get("title") or ""
+            if name:
+                names.append(name)
+        elif isinstance(s, str):
+            names.append(s)
+
+    return ", ".join(names)
+
+
+def flatten_profile(profile: dict) -> dict:
+    """Normalize profile data from EITHER actor into a fixed set of columns.
+    Maps fallback actor fields to the primary actor's column structure.
+    """
+    if not profile or "error" in profile:
+        return {k: "" for k in get_scraped_columns()}
+
+    is_fallback = profile.get("_source_actor") == "fallback"
+
+    # Name fields (work the same in both actors)
+    first_name = profile.get("firstName", "") or ""
+    last_name = profile.get("lastName", "") or ""
+    full_name = profile.get("fullName") or f"{first_name} {last_name}".strip()
+
+    if is_fallback:
+        # Fallback (harvestapi) field mapping
+        current_position = profile.get("currentPosition") or {}
+        if isinstance(current_position, list) and current_position:
+            current_position = current_position[0]
+        if not isinstance(current_position, dict):
+            current_position = {}
+
+        location_obj = profile.get("location") or {}
+        if not isinstance(location_obj, dict):
+            location_obj = {}
+
+        return {
+            "full_name": full_name,
+            "first_name": first_name,
+            "last_name": last_name,
+            "headline": profile.get("headline", "") or "",
+            "current_job_title": current_position.get("position", "") or "",
+            "current_company": current_position.get("companyName", "") or "",
+            "current_company_industry": "",
+            "current_company_size": "",
+            "current_company_website": "",
+            "current_job_location": "",
+            "current_job_duration": "",
+            "location": location_obj.get("linkedinText", "") or "",
+            "country": location_obj.get("countryCode", "") or "",
+            "about": profile.get("about", "") or "",
+            "email": "",
+            "phone": "",
+            "connections": profile.get("connectionsCount", "") or "",
+            "followers": profile.get("followerCount", "") or "",
+            "total_experience_years": "",
+            "is_premium": "true" if profile.get("premium") is True else "false" if profile.get("premium") is False else "",
+            "is_verified": "",
+            "is_creator": "",
+            "experiences": format_experiences(profile),
+            "education": format_education(profile),
+            "skills": format_skills(profile),
+        }
+    else:
+        # Primary (dev_fusion) field mapping
+        return {
+            "full_name": full_name,
+            "first_name": first_name,
+            "last_name": last_name,
+            "headline": profile.get("headline", "") or "",
+            "current_job_title": profile.get("jobTitle", "") or "",
+            "current_company": profile.get("companyName", "") or "",
+            "current_company_industry": profile.get("companyIndustry", "") or "",
+            "current_company_size": profile.get("companySize", "") or "",
+            "current_company_website": profile.get("companyWebsite", "") or "",
+            "current_job_location": profile.get("jobLocation", "") or "",
+            "current_job_duration": profile.get("currentJobDuration", "") or "",
+            "location": profile.get("addressWithCountry", "") or "",
+            "country": profile.get("addressCountryOnly", "") or "",
+            "about": profile.get("about", "") or "",
+            "email": profile.get("email", "") or "",
+            "phone": profile.get("mobileNumber", "") or "",
+            "connections": profile.get("connections", "") or "",
+            "followers": profile.get("followers", "") or "",
+            "total_experience_years": profile.get("totalExperienceYears", "") or "",
+            "is_premium": "true" if profile.get("isPremium") is True else "false" if profile.get("isPremium") is False else "",
+            "is_verified": "true" if profile.get("isVerified") is True else "false" if profile.get("isVerified") is False else "",
+            "is_creator": "true" if profile.get("isCreator") is True else "false" if profile.get("isCreator") is False else "",
+            "experiences": format_experiences(profile),
+            "education": format_education(profile),
+            "skills": format_skills(profile),
+        }
+
+
+def get_scraped_columns():
+    """Fixed column order for the output CSV."""
+    return [
+        "full_name", "first_name", "last_name", "headline",
+        "current_job_title", "current_company",
+        "current_company_industry", "current_company_size",
+        "current_company_website", "current_job_location",
+        "current_job_duration",
+        "location", "country", "about", "email", "phone",
+        "connections", "followers", "total_experience_years",
+        "is_premium", "is_verified", "is_creator",
+        "experiences", "education", "skills",
+    ]
 
 
 def find_url_column(headers):
@@ -342,40 +530,18 @@ def process_job(job_id: str, input_path: str, output_path: str):
             scraped += len(batch)
             update_job(job_id, progress=scraped)
 
-        # ── Build output with NATIVE actor fields ──────────────────
-        # First pass: flatten each profile, collecting all unique columns
-        # (so the CSV has the union of all native fields actually used)
-        flattened_profiles = {}
-        all_scraped_cols = []  # Preserve insertion order
-        seen_cols = set()
-        actors_used = set()
-
-        for url_key, profile in all_profiles.items():
-            if "error" in profile:
-                continue
-            actors_used.add(profile.get("_source_actor", "primary"))
-            flat = flatten_profile_native(profile)
-            flattened_profiles[url_key] = flat
-            # Collect new column names in the order they first appear
-            for col in flat.keys():
-                if col not in seen_cols:
-                    seen_cols.add(col)
-                    all_scraped_cols.append(col)
-
-        print(f"  Actors used in this job: {actors_used}")
-        print(f"  Native columns from JSON: {len(all_scraped_cols)}")
-
-        # Build output headers: original input cols + scraped_<native_field> + _source_actor
-        output_headers = list(input_headers) + [f"scraped_{c}" for c in all_scraped_cols]
-        if len(actors_used) > 0:
-            output_headers.append("scraped__source_actor")
+        # ── Build output with normalized columns ───────────────────
+        scraped_cols = get_scraped_columns()
+        output_headers = list(input_headers) + [f"scraped_{c}" for c in scraped_cols]
+        # Always add a source-actor column for transparency
+        output_headers.append("scraped__source_actor")
 
         matched = 0
         failed_urls = []
         output_rows = []
         for row, url in zip(rows, urls):
             out_row = dict(row)
-            flat = {}
+            flat = {c: "" for c in scraped_cols}
             source_actor = ""
 
             # Replace the original URL column with the cleaned URL
@@ -387,22 +553,16 @@ def process_job(job_id: str, input_path: str, output_path: str):
                     pub_id = url.rstrip("/").split("/in/")[-1]
                     profile = all_profiles.get(pub_id)
                 if profile and "error" not in profile:
-                    flat = flattened_profiles.get(url) or flattened_profiles.get(
-                        url.rstrip("/").split("/in/")[-1] if "/in/" in url else ""
-                    )
-                    if not flat:
-                        # Re-flatten if not in cache (edge case)
-                        flat = flatten_profile_native(profile)
+                    flat = flatten_profile(profile)
                     source_actor = profile.get("_source_actor", "primary")
                     matched += 1
                 else:
                     failed_urls.append(url)
                     print(f"  [no data] {url}")
 
-            for col in all_scraped_cols:
+            for col in scraped_cols:
                 out_row[f"scraped_{col}"] = flat.get(col, "")
-            if "scraped__source_actor" in output_headers:
-                out_row["scraped__source_actor"] = source_actor
+            out_row["scraped__source_actor"] = source_actor
             output_rows.append(out_row)
 
         with open(output_path, "w", newline="", encoding="utf-8") as f:
